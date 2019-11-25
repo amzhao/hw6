@@ -6,14 +6,18 @@ output: github_document
 
 ---
 
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
 ## Problem 1
 
 Load and clean data:
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(modelr)
-library(mgcv)
 library(purrr)
+
 ```
 
 
@@ -35,6 +39,82 @@ birthweight <-
 sum(is.na(birthweight))
 
 ```
+
+In my regression model for birthweight, I chose variables that are clinically relevant, and that women may be interested in knowing about. 
+For example, SES status is known to affect innumerous health outcomes. I'm interested in maternal health, specifically in examining the effect of a pregnant mother's actions and prenatal health on post-natal physiological outcomes. Thus, I've chosen variables that are related to the mother's prenatal health. 
+```{r}
+
+mymodel = lm(bwt ~ delwt + fincome + gaweeks + menarche + momage + parity + pnumlbw + ppbmi + smoken + wtgain, data = birthweight)
+mymodel %>% 
+  broom::tidy() %>% 
+  knitr::kable()
+mymodel %>% 
+  broom::glance() %>% 
+  knitr::kable()
+
+birthweight %>% 
+  modelr::add_predictions(mymodel) %>% 
+  modelr::add_residuals(mymodel) %>% 
+  ggplot(aes(x = pred , y = resid)) + geom_point(alpha = 0.5, color = "darkgreen") +
+  geom_hline(yintercept = 0, color = "darkblue") + 
+  labs(title = "Residuals and Predicted Value of Birthweight", 
+       x = "Predicted birthweight (grams)", 
+       y = "Residuals")
+
+```
+
+Comparison of my model to 1) one using length at birth and gestational age, 2) one using head circumference, length, sex, and all interactions thereof. 
+
+```{r}
+
+comp1 = lm(bwt ~ blength + gaweeks, data = birthweight)
+comp1 %>% 
+  broom::tidy() %>% 
+  knitr::kable()
+comp1 %>% 
+  broom::glance() %>% 
+  knitr::kable()
+
+comp2 = lm(bwt ~ babysex + bhead + blength + babysex*bhead + babysex*blength + bhead*blength + babysex*bhead*blength, data = birthweight)
+comp2 %>% 
+  broom::tidy() %>% 
+  knitr::kable()
+comp2 %>% 
+  broom::glance() %>% 
+  knitr::kable()
+
+
+
+cv_df <- 
+  crossv_mc(birthweight, 100) %>% 
+  mutate(train = map(train, as_tibble),
+         test = map(test, as_tibble)
+         ) %>% 
+  mutate(
+    mymodel = map(train, ~lm(bwt ~ delwt + fincome + gaweeks + menarche + momage + parity + pnumlbw + ppbmi + smoken + wtgain, data = .x)), 
+         comp1 = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+         comp2 = map(train, ~lm( bwt ~ babysex + bhead + blength + babysex*bhead + babysex*blength + bhead*blength + babysex*bhead*blength, data = .x))) %>%
+  mutate(rmse_mymodel = map2_dbl(mymodel, test, ~rmse(model = .x, data = .y)),
+         rmse_comp1 = map2_dbl(comp1, test, ~rmse(model = .x, data = .y)),
+         rmse_comp2 = map2_dbl(comp2, test, ~rmse(model = .x, data = .y)))
+
+cv_df %>% 
+	select(starts_with("rmse")) %>% 
+	gather(key = model, value = rmse) %>%
+	mutate(model = recode(model, "rmse_mymodel" = "My Model",
+												"rmse_comp1" = "Model 2",
+												"rmse_comp2" = "Model 3")) %>%
+	ggplot(aes(x = model, y = rmse)) +
+	  geom_boxplot() +
+		labs(
+		  title = "Models and RMSE",
+			x = "Model",
+			y = "Residual Mean Squared Error"
+		)
+
+
+```
+
 
 ## Problem 2
 
