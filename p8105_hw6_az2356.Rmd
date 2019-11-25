@@ -57,13 +57,13 @@ birthweight %>%
   modelr::add_residuals(mymodel) %>% 
   ggplot(aes(x = pred , y = resid)) + geom_point(alpha = 0.5, color = "darkgreen") +
   geom_hline(yintercept = 0, color = "darkblue") + 
-  labs(title = "Residuals and Predicted Value of Birthweight", 
+  labs(title = "Figure 1. Residuals and Predicted Value of Birthweight", 
        x = "Predicted birthweight (grams)", 
        y = "Residuals")
 
 ```
 
-Comparison of my model to 1) one using length at birth and gestational age, 2) one using head circumference, length, sex, and all interactions thereof. 
+Comparison of my model to one using length at birth and gestational age (Figure 2, Model 2), and one using head circumference, length, sex, and all interactions thereof (Figure 2, Model 3). 
 
 ```{r}
 
@@ -107,14 +107,21 @@ cv_df %>%
 	ggplot(aes(x = model, y = rmse)) +
 	  geom_boxplot() +
 		labs(
-		  title = "Models and RMSE",
+		  title = "Figure 2. Models and RMSE",
 			x = "Model",
 			y = "Residual Mean Squared Error"
 		)
 
-
 ```
+
+# Models
+
+As shown in Figure 2, my clinical, maternal-focused model is high in prediction error, the highest of the three models. Although there is no test and thus no statistical significance, my model clearly has a much higher RMSE than the other models. 
 
 
 ## Problem 2
+
+
+
+
 
