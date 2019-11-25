@@ -10,11 +10,12 @@ output: github_document
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 ```
 
-## Problem 1
+# Problem 1
 
-Load and clean data:
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(ggplot2)
+library(mgcv)
 library(modelr)
 library(purrr)
 
@@ -114,14 +115,100 @@ cv_df %>%
 
 ```
 
-# Models
+## Models
 
-As shown in Figure 2, my clinical, maternal-focused model is high in prediction error, the highest of the three models. Although there is no test and thus no statistical significance, my model clearly has a much higher RMSE than the other models. 
-
-
-## Problem 2
+As shown in Figure 2, my maternal-focused model is high in prediction error, the highest of the three models. Although there is no test and thus no statistical significance, my model clearly has a much higher RMSE than the other models. This model should not be used to predict birthweight. 
 
 
+# Problem 2
+
+```{r}
+
+weather = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(id, USW00094728 = "CentralPark_NY"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+
+```
+
+
+```{r}
+boot_sample = function(df) {
+  sample_frac(df, replace = TRUE)
+}
+boot_straps = 
+  tibble(
+    strap_number = 1:5000,
+    strap_sample = rerun(5000, boot_sample(weather))
+  )
+
+
+results <-
+  boot_straps %>% 
+  mutate(
+    models = map(strap_sample, ~lm(tmax ~ tmin, data=.x)),
+    results = map(models, broom::tidy)) %>% 
+  select(-strap_sample, -models) %>% 
+  unnest(cols = c(results)) %>% 
+  select(strap_number, term, estimate) %>% 
+  pivot_wider(
+    names_from = "term",
+    values_from = "estimate"
+  ) %>% 
+  janitor::clean_names() %>% 
+  mutate(log = log(intercept*tmin)) 
+
+
+results2 <-
+  boot_straps %>% 
+  mutate(
+    models = map(strap_sample, ~lm(tmax ~ tmin, data = .x)),
+    results = map(models, broom::glance)) %>% 
+  select(-strap_sample, -models) %>% 
+  unnest(cols = c(results))
 
 
 
+plotdata <-
+  ggplot(
+    data = results, aes(x = log)) + geom_histogram() + 
+  labs(
+    title = "Figure 3. Distribution of Log(beta0*beta1) Estimates",
+    x = "Log Beta0*Beta1",
+    y = "Count"
+    ) 
+
+plotdata
+
+plotdata2 <-
+  ggplot(data = results2, aes(x = r.squared)) + geom_histogram() + 
+  labs(
+    title = "Figure 4. Distribution of R Squared Estimates",
+    x = "R Squared",
+    y = "Count"
+    ) 
+
+plotdata2
+
+```
+
+Shown in Figures 3 and 4, the plots of the estimates of beta0*beta1 and R squared are relatively normal. The R squared plot may be slightly skewed right, but is mostly normal. 
+
+
+```{r}
+
+quantile(pull(results, log), probs = c(0.025, 0.975)) 
+quantile(pull(results2, r.squared), probs = c(0.025, 0.975)) 
+
+```
+
+log(b0*b1) 95% Confidence Interval: 1.965, 2.059
+
+R squared 95% Confidence Interval: 0.894, 0.927
